@@ -72,9 +72,15 @@ def root():
 
 
 @app.get("/health", tags=["Info"])
-def health(db: Session = Depends(get_db)):
-    book_count = db.query(Book).count()
-    return {"status": "healthy", "books_in_library": book_count}
+def health():
+    """Healthcheck endpoint — returns OK immediately so Railway doesn't kill the container."""
+    try:
+        from database import get_db_context
+        with get_db_context() as db:
+            book_count = db.query(Book).count()
+            return {"status": "healthy", "books_in_library": book_count}
+    except Exception:
+        return {"status": "starting", "books_in_library": 0}
 
 
 # ── MODE 1: Single Book Processing ─────────────────────────────────
