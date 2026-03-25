@@ -271,6 +271,60 @@
 
   .markdown-content th { background: var(--surface2); font-weight: 600; }
 
+  /* Cards for categories, themes, debates */
+  .card-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  .info-card {
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+
+  .info-card:hover { border-color: var(--accent); }
+
+  .info-card-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--accent2);
+    margin-bottom: 6px;
+  }
+
+  .info-card-subtitle {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 10px;
+  }
+
+  .info-card-body {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .info-card-body p { margin-bottom: 6px; }
+
+  .info-card-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .info-card-section strong { color: var(--accent2); font-size: 12px; }
+
+  .idea-item {
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+
+  .idea-name { font-weight: 600; font-size: 14px; color: var(--accent2); }
+  .idea-book { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .idea-def { font-size: 13px; margin-top: 6px; line-height: 1.5; }
+
   @media (max-width: 600px) {
     .container { padding: 12px; }
     header h1 { font-size: 22px; }
@@ -297,6 +351,10 @@
   <div class="tabs">
     <button class="tab active" data-panel="add">Add Book</button>
     <button class="tab" data-panel="library">Library</button>
+    <button class="tab" data-panel="categories">Categories</button>
+    <button class="tab" data-panel="themes">Themes</button>
+    <button class="tab" data-panel="ideas">Ideas</button>
+    <button class="tab" data-panel="debates">Debates</button>
     <button class="tab" data-panel="query">Ask</button>
     <button class="tab" data-panel="masterlog">Master Log</button>
   </div>
@@ -351,6 +409,29 @@
     <div id="bookDetail"></div>
   </div>
 
+  <!-- CATEGORIES -->
+  <div class="panel" id="panel-categories">
+    <div id="categoriesList"></div>
+  </div>
+
+  <!-- THEMES -->
+  <div class="panel" id="panel-themes">
+    <div id="themesList"></div>
+  </div>
+
+  <!-- IDEAS -->
+  <div class="panel" id="panel-ideas">
+    <div style="margin-bottom:16px">
+      <input type="text" id="searchIdeas" placeholder="Search concepts, frameworks, models..." oninput="loadIdeas()">
+    </div>
+    <div id="ideasList"></div>
+  </div>
+
+  <!-- DEBATES -->
+  <div class="panel" id="panel-debates">
+    <div id="debatesList"></div>
+  </div>
+
   <!-- QUERY -->
   <div class="panel" id="panel-query">
     <div class="form-group">
@@ -388,6 +469,10 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
 
     if (tab.dataset.panel === 'library') loadBooks();
+    if (tab.dataset.panel === 'categories') loadCategories();
+    if (tab.dataset.panel === 'themes') loadThemes();
+    if (tab.dataset.panel === 'ideas') loadIdeas();
+    if (tab.dataset.panel === 'debates') loadDebates();
   });
 });
 
@@ -537,6 +622,111 @@ async function queryLibrary() {
     result.innerHTML = html;
   } catch (e) {
     result.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Categories
+async function loadCategories() {
+  const el = document.getElementById('categoriesList');
+  el.innerHTML = '<div class="loading">Loading categories</div>';
+  try {
+    const r = await fetch(API + '/categories');
+    const data = await r.json();
+    if (!data.categories || data.categories.length === 0) {
+      el.innerHTML = '<div class="empty-state"><p style="font-size:24px">No categories yet</p><p>Categories are created when you add books</p></div>';
+      return;
+    }
+    el.innerHTML = '<div class="card-grid">' + data.categories.map(c => `
+      <div class="info-card">
+        <div class="info-card-title">${esc(c.name)}</div>
+        <div class="info-card-subtitle">${c.book_count || 0} book${c.book_count === 1 ? '' : 's'}</div>
+        <div class="info-card-body">
+          ${c.books && c.books.length ? '<p><strong>Books:</strong> ' + c.books.map(b => esc(b)).join(', ') + '</p>' : ''}
+          ${c.central_debate ? '<div class="info-card-section"><strong>Central Debate</strong><br>' + esc(c.central_debate) + '</div>' : ''}
+          ${c.synthesis_insight ? '<div class="info-card-section"><strong>Synthesis</strong><br>' + esc(c.synthesis_insight) + '</div>' : ''}
+        </div>
+      </div>
+    `).join('') + '</div>';
+  } catch (e) {
+    el.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Themes
+async function loadThemes() {
+  const el = document.getElementById('themesList');
+  el.innerHTML = '<div class="loading">Loading themes</div>';
+  try {
+    const r = await fetch(API + '/themes');
+    const data = await r.json();
+    if (!data.themes || data.themes.length === 0) {
+      el.innerHTML = '<div class="empty-state"><p style="font-size:24px">No themes yet</p><p>Themes emerge when you add books and generate the master log</p></div>';
+      return;
+    }
+    el.innerHTML = '<div class="card-grid">' + data.themes.map(t => `
+      <div class="info-card">
+        <div class="info-card-title">${esc(t.name)}</div>
+        <div class="info-card-subtitle">${t.books ? t.books.length : 0} book${t.books && t.books.length === 1 ? '' : 's'}</div>
+        <div class="info-card-body">
+          ${t.books && t.books.length ? '<p><strong>Books:</strong> ' + t.books.map(b => esc(b)).join(', ') + '</p>' : ''}
+          ${t.consensus_view ? '<div class="info-card-section"><strong>Consensus View</strong><br>' + esc(t.consensus_view) + '</div>' : ''}
+          ${t.curator_synthesis ? '<div class="info-card-section"><strong>Curator Synthesis</strong><br>' + esc(t.curator_synthesis) + '</div>' : ''}
+        </div>
+      </div>
+    `).join('') + '</div>';
+  } catch (e) {
+    el.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Ideas
+async function loadIdeas() {
+  const el = document.getElementById('ideasList');
+  const q = document.getElementById('searchIdeas').value.trim();
+  el.innerHTML = '<div class="loading">Loading ideas</div>';
+  try {
+    const url = q ? API + '/ideas?q=' + encodeURIComponent(q) : API + '/ideas';
+    const r = await fetch(url);
+    const data = await r.json();
+    if (!data.ideas || data.ideas.length === 0) {
+      el.innerHTML = '<div class="empty-state"><p style="font-size:24px">' + (q ? 'No matching ideas' : 'No ideas yet') + '</p><p>Ideas are indexed when you add books</p></div>';
+      return;
+    }
+    el.innerHTML = data.ideas.map(i => `
+      <div class="idea-item">
+        <div class="idea-name">${esc(i.concept_name)}</div>
+        ${i.book ? '<div class="idea-book">from ' + esc(i.book) + '</div>' : ''}
+        ${i.definition ? '<div class="idea-def">' + esc(i.definition) + '</div>' : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Debates
+async function loadDebates() {
+  const el = document.getElementById('debatesList');
+  el.innerHTML = '<div class="loading">Loading debates</div>';
+  try {
+    const r = await fetch(API + '/debates');
+    const data = await r.json();
+    if (!data.debates || data.debates.length === 0) {
+      el.innerHTML = '<div class="empty-state"><p style="font-size:24px">No debates yet</p><p>Debates surface when books in your library have conflicting views</p></div>';
+      return;
+    }
+    el.innerHTML = '<div class="card-grid">' + data.debates.map(d => `
+      <div class="info-card">
+        <div class="info-card-title">${esc(d.question)}</div>
+        <div class="info-card-body">
+          ${d.side_a ? '<div class="info-card-section"><strong>Side A</strong><br>' + esc(d.side_a) + '</div>' : ''}
+          ${d.side_b ? '<div class="info-card-section"><strong>Side B</strong><br>' + esc(d.side_b) + '</div>' : ''}
+          ${d.curator_position ? '<div class="info-card-section"><strong>Curator Position</strong><br>' + esc(d.curator_position) + '</div>' : ''}
+        </div>
+      </div>
+    `).join('') + '</div>';
+  } catch (e) {
+    el.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
   }
 }
 
