@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book Intelligence Agent</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --accent: #8b5cf6;
+    --accent2: #a78bfa;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+  header {
+    text-align: center;
+    padding: 40px 0 30px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 30px;
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+
+  header p { color: var(--text2); font-size: 14px; }
+
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    text-align: center;
+    min-width: 100px;
+  }
+
+  .stat-num { font-size: 22px; font-weight: 700; color: var(--accent2); }
+  .stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 7px;
+    transition: all 0.2s;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent); color: white; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Forms */
+  .form-group { margin-bottom: 16px; }
+
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  input, textarea, select {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border 0.2s;
+  }
+
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  .btn {
+    padding: 12px 24px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn:hover { background: var(--accent2); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+
+  /* Depth selector */
+  .depth-options { display: flex; gap: 8px; }
+
+  .depth-option {
+    flex: 1;
+    padding: 8px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .depth-option:hover { border-color: var(--text2); }
+  .depth-option.selected { border-color: var(--accent); background: var(--surface2); }
+  .depth-option .depth-name { font-weight: 600; font-size: 13px; }
+  .depth-option .depth-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  /* Results */
+  .result-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-top: 20px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.7;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  .result-area h1, .result-area h2, .result-area h3 {
+    color: var(--accent2);
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  .result-area h1 { font-size: 20px; }
+  .result-area h2 { font-size: 17px; }
+  .result-area h3 { font-size: 15px; }
+
+  .result-area strong { color: var(--accent2); }
+  .result-area hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text2);
+  }
+
+  .loading::after {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Book list */
+  .book-list { list-style: none; }
+
+  .book-item {
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .book-item:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+  .book-title { font-weight: 600; font-size: 15px; }
+  .book-author { color: var(--text2); font-size: 13px; }
+
+  .book-meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .stars { color: var(--yellow); }
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text2);
+  }
+
+  .empty-state p { margin-top: 8px; font-size: 14px; }
+
+  /* Markdown rendering */
+  .markdown-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+  }
+
+  .markdown-content td, .markdown-content th {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .markdown-content th { background: var(--surface2); font-weight: 600; }
+
+  @media (max-width: 600px) {
+    .container { padding: 12px; }
+    header h1 { font-size: 22px; }
+    .tabs { flex-wrap: wrap; }
+    .tab { font-size: 12px; padding: 8px 10px; }
+    .depth-options { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Book Intelligence Agent</h1>
+    <p>Your living knowledge library — structured, connected, opinionated</p>
+    <div class="stats-bar" id="statsBar">
+      <div class="stat"><div class="stat-num" id="statBooks">-</div><div class="stat-label">Books</div></div>
+      <div class="stat"><div class="stat-num" id="statCategories">-</div><div class="stat-label">Categories</div></div>
+      <div class="stat"><div class="stat-num" id="statThemes">-</div><div class="stat-label">Themes</div></div>
+      <div class="stat"><div class="stat-num" id="statIdeas">-</div><div class="stat-label">Ideas</div></div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-panel="add">Add Book</button>
+    <button class="tab" data-panel="library">Library</button>
+    <button class="tab" data-panel="query">Ask</button>
+    <button class="tab" data-panel="masterlog">Master Log</button>
+  </div>
+
+  <!-- ADD BOOK -->
+  <div class="panel active" id="panel-add">
+    <div class="form-group">
+      <label>Book Title</label>
+      <input type="text" id="bookTitle" placeholder="e.g. Deep Work by Cal Newport" autofocus>
+    </div>
+
+    <div class="form-group">
+      <label>Processing Depth</label>
+      <div class="depth-options">
+        <div class="depth-option selected" data-depth="FULL">
+          <div class="depth-name">Full</div>
+          <div class="depth-desc">Complete Book Card with all sections</div>
+        </div>
+        <div class="depth-option" data-depth="CORE">
+          <div class="depth-name">Core</div>
+          <div class="depth-desc">Card + top ideas only</div>
+        </div>
+        <div class="depth-option" data-depth="QUICK">
+          <div class="depth-name">Quick</div>
+          <div class="depth-desc">Verdict + top 3 ideas</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Your Context <span style="color:var(--text2);font-weight:400;text-transform:none">(optional)</span></label>
+      <input type="text" id="userContext" placeholder="e.g. Engineering manager building a team">
+    </div>
+
+    <button class="btn" id="addBookBtn" onclick="addBook()">Process Book</button>
+
+    <div id="addResult"></div>
+  </div>
+
+  <!-- LIBRARY -->
+  <div class="panel" id="panel-library">
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input type="text" id="searchBooks" placeholder="Search books..." style="flex:1" oninput="loadBooks()">
+      <select id="sortBooks" onchange="loadBooks()" style="width:auto">
+        <option value="relevance">By Relevance</option>
+        <option value="added">Recently Added</option>
+        <option value="title">Alphabetical</option>
+        <option value="year">By Year</option>
+      </select>
+    </div>
+    <div id="bookList"></div>
+    <div id="bookDetail"></div>
+  </div>
+
+  <!-- QUERY -->
+  <div class="panel" id="panel-query">
+    <div class="form-group">
+      <label>Ask your library anything</label>
+      <textarea id="queryText" placeholder="e.g. What does the library say about building habits?&#10;e.g. Compare Deep Work and Atomic Habits&#10;e.g. I'm a new manager — what should I read first?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Your situation <span style="color:var(--text2);font-weight:400;text-transform:none">(optional)</span></label>
+      <input type="text" id="queryContext" placeholder="e.g. Product manager, 2 years in">
+    </div>
+    <button class="btn" onclick="queryLibrary()">Ask</button>
+    <div id="queryResult"></div>
+  </div>
+
+  <!-- MASTER LOG -->
+  <div class="panel" id="panel-masterlog">
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn" onclick="generateMasterLog()">Generate / Update Master Log</button>
+      <button class="btn btn-secondary" onclick="loadMasterLog()">View Latest</button>
+    </div>
+    <div id="masterlogResult"></div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let selectedDepth = 'FULL';
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+
+    if (tab.dataset.panel === 'library') loadBooks();
+  });
+});
+
+// Depth selector
+document.querySelectorAll('.depth-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.depth-option').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+    selectedDepth = opt.dataset.depth;
+  });
+});
+
+// Enter key to submit
+document.getElementById('bookTitle').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addBook();
+});
+
+// Load stats
+async function loadStats() {
+  try {
+    const r = await fetch(API + '/library');
+    const data = await r.json();
+    document.getElementById('statBooks').textContent = data.total_books || 0;
+    document.getElementById('statCategories').textContent = data.total_categories || 0;
+    document.getElementById('statThemes').textContent = data.total_themes || 0;
+    document.getElementById('statIdeas').textContent = data.total_ideas_indexed || 0;
+  } catch (e) {
+    console.error('Stats error:', e);
+  }
+}
+
+// Add book
+async function addBook() {
+  const title = document.getElementById('bookTitle').value.trim();
+  if (!title) return;
+
+  const context = document.getElementById('userContext').value.trim() || 'Knowledge worker building a personal library';
+  const btn = document.getElementById('addBookBtn');
+  const result = document.getElementById('addResult');
+
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  result.innerHTML = '<div class="loading">Claude is reading and analysing this book — this takes 15–30 seconds</div>';
+
+  try {
+    const r = await fetch(API + '/books', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ book_title: title, depth: selectedDepth, user_context: context })
+    });
+    const data = await r.json();
+
+    if (data.book_card_markdown) {
+      result.innerHTML = '<div class="result-area markdown-content">' + renderMarkdown(data.book_card_markdown) + '</div>';
+    } else if (data.status === 'already_exists') {
+      result.innerHTML = '<div class="result-area"><strong>Already in library!</strong>\n\n' + renderMarkdown(data.book_card_markdown || 'This book is already processed.') + '</div>';
+    } else {
+      result.innerHTML = '<div class="result-area">' + JSON.stringify(data, null, 2) + '</div>';
+    }
+    document.getElementById('bookTitle').value = '';
+    loadStats();
+  } catch (e) {
+    result.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Process Book';
+}
+
+// Load books
+async function loadBooks() {
+  const list = document.getElementById('bookList');
+  const sort = document.getElementById('sortBooks').value;
+
+  try {
+    const r = await fetch(API + '/books?sort=' + sort);
+    const data = await r.json();
+
+    if (!data.books || data.books.length === 0) {
+      list.innerHTML = '<div class="empty-state"><p style="font-size:24px">No books yet</p><p>Add your first book from the "Add Book" tab</p></div>';
+      return;
+    }
+
+    list.innerHTML = '<ul class="book-list">' + data.books.map(b => `
+      <li class="book-item" onclick="viewBook(${b.id})">
+        <div class="book-title">${esc(b.title)}</div>
+        <div class="book-author">${esc(b.author || '')}</div>
+        <div class="book-meta">
+          <span class="stars">${'★'.repeat(b.relevance_score || 0)}${'☆'.repeat(5 - (b.relevance_score || 0))}</span>
+          <span>${b.published_year || ''}</span>
+          ${(b.categories || []).map(c => '<span class="tag">' + esc(c) + '</span>').join('')}
+        </div>
+      </li>
+    `).join('') + '</ul>';
+  } catch (e) {
+    list.innerHTML = '<div class="result-area" style="color:var(--red)">Error loading books: ' + e.message + '</div>';
+  }
+}
+
+// View single book
+async function viewBook(id) {
+  const detail = document.getElementById('bookDetail');
+  detail.innerHTML = '<div class="loading">Loading book card</div>';
+
+  try {
+    const r = await fetch(API + '/books/' + id);
+    const data = await r.json();
+
+    if (data.book_card_markdown) {
+      detail.innerHTML = '<div class="result-area markdown-content">' + renderMarkdown(data.book_card_markdown) + '</div>';
+    } else {
+      detail.innerHTML = '<div class="result-area">' + JSON.stringify(data, null, 2) + '</div>';
+    }
+  } catch (e) {
+    detail.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Query
+async function queryLibrary() {
+  const query = document.getElementById('queryText').value.trim();
+  if (!query) return;
+
+  const context = document.getElementById('queryContext').value.trim() || 'Knowledge worker';
+  const result = document.getElementById('queryResult');
+  result.innerHTML = '<div class="loading">Searching the library and synthesising an answer</div>';
+
+  try {
+    const r = await fetch(API + '/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query, user_context: context })
+    });
+    const data = await r.json();
+
+    let html = '<div class="result-area markdown-content">';
+    if (data.answer) {
+      html += renderMarkdown(data.answer);
+    }
+    if (data.recommended_reading_sequence && data.recommended_reading_sequence.length > 0) {
+      html += '\n\n<strong>Recommended reading order:</strong>\n';
+      data.recommended_reading_sequence.forEach(r => {
+        html += `\n${r.rank}. <strong>${esc(r.title)}</strong> — ${esc(r.reason)}`;
+      });
+    }
+    html += '</div>';
+    result.innerHTML = html;
+  } catch (e) {
+    result.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Master log
+async function loadMasterLog() {
+  const result = document.getElementById('masterlogResult');
+  result.innerHTML = '<div class="loading">Loading master log</div>';
+
+  try {
+    const r = await fetch(API + '/master-log');
+    const data = await r.json();
+
+    if (data.full_markdown) {
+      result.innerHTML = '<div class="result-area markdown-content">' + renderMarkdown(data.full_markdown) + '</div>';
+    } else {
+      result.innerHTML = '<div class="result-area">' + (data.message || 'No master log yet. Click "Generate" to create one.') + '</div>';
+    }
+  } catch (e) {
+    result.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+async function generateMasterLog() {
+  const result = document.getElementById('masterlogResult');
+  result.innerHTML = '<div class="loading">Generating master log — this may take a minute</div>';
+
+  try {
+    const r = await fetch(API + '/master-log', { method: 'POST' });
+    const data = await r.json();
+
+    if (data.master_log_markdown) {
+      result.innerHTML = '<div class="result-area markdown-content">' + renderMarkdown(data.master_log_markdown) + '</div>';
+    } else {
+      result.innerHTML = '<div class="result-area">' + (data.message || JSON.stringify(data, null, 2)) + '</div>';
+    }
+  } catch (e) {
+    result.innerHTML = '<div class="result-area" style="color:var(--red)">Error: ' + e.message + '</div>';
+  }
+}
+
+// Simple markdown renderer
+function renderMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^---$/gm, '<hr>')
+    .replace(/^\| (.+) \|$/gm, (match) => {
+      const cells = match.slice(1, -1).split('|').map(c => c.trim());
+      return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+    })
+    .replace(/\n/g, '<br>');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// Init
+loadStats();
+</script>
+</body>
+</html>

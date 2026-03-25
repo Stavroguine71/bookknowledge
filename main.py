@@ -17,7 +17,10 @@ print(f"PORT={os.environ.get('PORT', 'NOT SET')}", flush=True)
 print(f"DATABASE_URL={'SET' if os.environ.get('DATABASE_URL') else 'NOT SET'}", flush=True)
 print(f"ANTHROPIC_API_KEY={'SET' if os.environ.get('ANTHROPIC_API_KEY') else 'NOT SET'}", flush=True)
 
+from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 print("FastAPI imported OK", flush=True)
@@ -74,11 +77,21 @@ app = FastAPI(
 
 print("FastAPI app created OK", flush=True)
 
+# Serve static files (the dashboard UI)
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    print(f"Static files mounted from {STATIC_DIR}", flush=True)
+
 
 # ── Health & Info ───────────────────────────────────────────────────
 
-@app.get("/", tags=["Info"])
+@app.get("/", tags=["Info"], include_in_schema=False)
 def root():
+    """Serve the dashboard UI."""
+    index = Path(__file__).parent / "static" / "index.html"
+    if index.exists():
+        return FileResponse(str(index))
     return {
         "name": "Book Intelligence Agent",
         "version": "1.0.0",
