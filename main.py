@@ -3,26 +3,38 @@ Book Intelligence Agent — FastAPI Application
 A living knowledge library that grows smarter with every book.
 """
 
+# Print immediately on import so Railway logs show the container started
+import sys
+print("=== Book Intelligence Agent starting ===", flush=True)
+print(f"Python: {sys.version}", flush=True)
+
+import os
 import logging
 import threading
 from contextlib import asynccontextmanager
 
+print(f"PORT={os.environ.get('PORT', 'NOT SET')}", flush=True)
+print(f"DATABASE_URL={'SET' if os.environ.get('DATABASE_URL') else 'NOT SET'}", flush=True)
+print(f"ANTHROPIC_API_KEY={'SET' if os.environ.get('ANTHROPIC_API_KEY') else 'NOT SET'}", flush=True)
+
 from fastapi import FastAPI, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+
+print("FastAPI imported OK", flush=True)
 
 from config import get_settings
 from database import init_db, get_db
-from agent import BookIntelligenceAgent
 from schemas import ProcessBookRequest, BatchProcessRequest, QueryRequest, QuickAddRequest
 from models import Book, Category, Theme, Debate, IdeaIndex, MasterLog
 
-logging.basicConfig(level=logging.INFO)
+print("All modules imported OK", flush=True)
+
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# Track whether DB is ready (set by background init thread)
+# Track whether DB is ready
 _db_ready = False
 
 
@@ -30,22 +42,23 @@ def _background_db_init():
     """Initialize DB in background so the server can start immediately."""
     global _db_ready
     try:
+        print("Background DB init starting...", flush=True)
         init_db(retries=10, delay=2.0)
         _db_ready = True
-        logger.info("Database ready.")
+        print("Database ready!", flush=True)
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        logger.error("Database endpoints will fail until DB is available.")
+        print(f"Database init failed: {e}", flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start the server immediately; init DB in background."""
-    logger.info("Starting Book Intelligence Agent...")
-    # Don't block — init DB in a background thread so /health is reachable
+    print("Lifespan: starting background DB init...", flush=True)
     thread = threading.Thread(target=_background_db_init, daemon=True)
     thread.start()
+    print("Lifespan: server ready to accept requests", flush=True)
     yield
+    print("Lifespan: shutting down", flush=True)
 
 
 app = FastAPI(
@@ -59,6 +72,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+print("FastAPI app created OK", flush=True)
+
 
 # ── Health & Info ───────────────────────────────────────────────────
 
@@ -68,19 +83,6 @@ def root():
         "name": "Book Intelligence Agent",
         "version": "1.0.0",
         "description": "A living knowledge library for business, strategy, and psychology books.",
-        "endpoints": {
-            "POST /books": "Process a single book → Book Card",
-            "POST /books/batch": "Process multiple books → Book Cards + Synthesis",
-            "POST /master-log": "Generate/update the Master Log",
-            "POST /query": "Query the library",
-            "GET /library": "Get library stats",
-            "GET /books": "List all books",
-            "GET /books/{id}": "Get a specific book card",
-            "GET /categories": "List all categories",
-            "GET /themes": "List all themes",
-            "GET /debates": "List all debates",
-            "GET /ideas": "Search the idea index",
-        },
     }
 
 
@@ -102,10 +104,7 @@ def health():
 
 @app.post("/books", tags=["Books"])
 def process_book(request: ProcessBookRequest, db: Session = Depends(get_db)):
-    """
-    Process a single book and produce a full Book Card.
-    The book is added to the library and all connections are updated.
-    """
+    from agent import BookIntelligenceAgent
     try:
         agent = BookIntelligenceAgent(db)
         result = agent.process_book(
@@ -125,10 +124,7 @@ def process_book(request: ProcessBookRequest, db: Session = Depends(get_db)):
 
 @app.post("/books/batch", tags=["Books"])
 def process_batch(request: BatchProcessRequest, db: Session = Depends(get_db)):
-    """
-    Process multiple books at once.
-    Produces Book Cards for each + a Batch Synthesis showing connections.
-    """
+    from agent import BookIntelligenceAgent
     try:
         agent = BookIntelligenceAgent(db)
         result = agent.process_batch(
@@ -146,10 +142,7 @@ def process_batch(request: BatchProcessRequest, db: Session = Depends(get_db)):
 
 @app.post("/master-log", tags=["Master Log"])
 def generate_master_log(db: Session = Depends(get_db)):
-    """
-    Generate or update the Master Log — the living library document.
-    Synthesises all books, categories, themes, debates, and curator picks.
-    """
+    from agent import BookIntelligenceAgent
     try:
         agent = BookIntelligenceAgent(db)
         result = agent.generate_master_log()
@@ -161,7 +154,6 @@ def generate_master_log(db: Session = Depends(get_db)):
 
 @app.get("/master-log", tags=["Master Log"])
 def get_latest_master_log(db: Session = Depends(get_db)):
-    """Get the latest version of the Master Log."""
     log = db.query(MasterLog).order_by(MasterLog.version.desc()).first()
     if not log:
         return {"status": "empty", "message": "No master log generated yet. POST /master-log to create one."}
@@ -179,10 +171,7 @@ def get_latest_master_log(db: Session = Depends(get_db)):
 
 @app.post("/query", tags=["Query"])
 def query_library(request: QueryRequest, db: Session = Depends(get_db)):
-    """
-    Query the library with any question.
-    Gets synthesised answers drawing on all books, themes, and debates.
-    """
+    from agent import BookIntelligenceAgent
     try:
         agent = BookIntelligenceAgent(db)
         result = agent.query_library(
@@ -199,7 +188,7 @@ def query_library(request: QueryRequest, db: Session = Depends(get_db)):
 
 @app.get("/library", tags=["Library"])
 def get_library_stats(db: Session = Depends(get_db)):
-    """Get an overview of the current library state."""
+    from agent import BookIntelligenceAgent
     agent = BookIntelligenceAgent(db)
     return agent.get_library_stats()
 
@@ -210,12 +199,9 @@ def list_books(
     sort: str = Query("relevance", description="Sort by: relevance, title, year, added"),
     db: Session = Depends(get_db),
 ):
-    """List all books in the library."""
     query = db.query(Book)
-
     if category:
         query = query.filter(Book.categories.any(Category.name.ilike(f"%{category}%")))
-
     if sort == "relevance":
         query = query.order_by(Book.relevance_score.desc())
     elif sort == "title":
@@ -224,7 +210,6 @@ def list_books(
         query = query.order_by(Book.published_year.desc())
     elif sort == "added":
         query = query.order_by(Book.created_at.desc())
-
     books = query.all()
     return {
         "count": len(books),
@@ -245,7 +230,6 @@ def list_books(
 
 @app.get("/books/{book_id}", tags=["Books"])
 def get_book(book_id: int, db: Session = Depends(get_db)):
-    """Get the full Book Card for a specific book."""
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -255,26 +239,17 @@ def get_book(book_id: int, db: Session = Depends(get_db)):
         "author": book.author,
         "published_year": book.published_year,
         "relevance_score": book.relevance_score,
-        "relevance_rationale": book.relevance_rationale,
-        "audience": book.audience,
         "categories": [c.name for c in book.categories],
         "core_argument": book.core_argument,
-        "evidence_method": book.evidence_method,
-        "ideas_worth_keeping": book.ideas_worth_keeping,
-        "frameworks_tools": book.frameworks_tools,
-        "what_gets_right": book.what_gets_right,
-        "what_gets_wrong": book.what_gets_wrong,
         "curator_verdict": book.curator_verdict,
-        "connections": book.connections,
         "book_card_markdown": book.book_card_markdown,
-        "priority_rank": book.priority_rank,
+        "connections": book.connections,
         "created_at": book.created_at.isoformat(),
     }
 
 
 @app.delete("/books/{book_id}", tags=["Books"])
 def delete_book(book_id: int, db: Session = Depends(get_db)):
-    """Remove a book from the library."""
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -286,7 +261,6 @@ def delete_book(book_id: int, db: Session = Depends(get_db)):
 
 @app.get("/categories", tags=["Categories"])
 def list_categories(db: Session = Depends(get_db)):
-    """List all categories with their book counts and insights."""
     cats = db.query(Category).all()
     return {
         "count": len(cats),
@@ -297,7 +271,6 @@ def list_categories(db: Session = Depends(get_db)):
                 "book_count": len(c.books),
                 "books": [b.title for b in c.books],
                 "central_debate": c.central_debate,
-                "best_entry_point": c.best_entry_point,
                 "synthesis_insight": c.synthesis_insight,
             }
             for c in cats
@@ -307,7 +280,6 @@ def list_categories(db: Session = Depends(get_db)):
 
 @app.get("/themes", tags=["Themes"])
 def list_themes(db: Session = Depends(get_db)):
-    """List all cross-book themes."""
     themes = db.query(Theme).all()
     return {
         "count": len(themes),
@@ -317,7 +289,6 @@ def list_themes(db: Session = Depends(get_db)):
                 "name": t.name,
                 "books": [b.title for b in t.books],
                 "consensus_view": t.consensus_view,
-                "dissenting_view": t.dissenting_view,
                 "curator_synthesis": t.curator_synthesis,
             }
             for t in themes
@@ -327,7 +298,6 @@ def list_themes(db: Session = Depends(get_db)):
 
 @app.get("/debates", tags=["Debates"])
 def list_debates(db: Session = Depends(get_db)):
-    """List all intellectual debates and tensions surfaced across books."""
     debates = db.query(Debate).all()
     return {
         "count": len(debates),
@@ -336,11 +306,8 @@ def list_debates(db: Session = Depends(get_db)):
                 "id": d.id,
                 "question": d.question,
                 "side_a": d.side_a_position,
-                "side_a_books": d.side_a_books,
                 "side_b": d.side_b_position,
-                "side_b_books": d.side_b_books,
                 "curator_position": d.curator_position,
-                "resolution_path": d.resolution_path,
             }
             for d in debates
         ],
@@ -352,7 +319,6 @@ def search_ideas(
     q: str = Query(None, description="Search term for concept names"),
     db: Session = Depends(get_db),
 ):
-    """Search the idea index — named concepts, frameworks, and models."""
     query = db.query(IdeaIndex)
     if q:
         query = query.filter(IdeaIndex.concept_name.ilike(f"%{q}%"))
@@ -365,21 +331,14 @@ def search_ideas(
                 "concept_name": i.concept_name,
                 "book": i.book.title if i.book else None,
                 "definition": i.definition,
-                "related_concepts": i.related_concepts,
             }
             for i in ideas
         ],
     }
 
 
-# ── Quick Add (lightweight entry) ──────────────────────────────────
-
 @app.post("/books/quick-add", tags=["Books"])
 def quick_add_book(request: QuickAddRequest, db: Session = Depends(get_db)):
-    """
-    Quick-add a book with minimal info (no Claude processing).
-    Useful for rapidly expanding the library with abbreviated entries.
-    """
     book = Book(
         title=request.title,
         author=request.author,
@@ -389,7 +348,6 @@ def quick_add_book(request: QuickAddRequest, db: Session = Depends(get_db)):
         curator_verdict=f"Worth reading: {request.worth_reading}. Best idea: {request.best_idea}",
         connections={"connects_to": request.connects_to},
     )
-
     cat = db.query(Category).filter(Category.name.ilike(f"%{request.category}%")).first()
     if not cat:
         slug = request.category.lower().replace(" & ", "-and-").replace(" ", "-")
@@ -397,13 +355,6 @@ def quick_add_book(request: QuickAddRequest, db: Session = Depends(get_db)):
         db.add(cat)
         db.flush()
     book.categories.append(cat)
-
     db.add(book)
     db.commit()
-
-    return {
-        "status": "quick_added",
-        "book_id": book.id,
-        "title": book.title,
-        "category": cat.name,
-    }
+    return {"status": "quick_added", "book_id": book.id, "title": book.title}
