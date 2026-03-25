@@ -3,14 +3,13 @@ Database models for the Book Intelligence Agent.
 PostgreSQL schema for the living knowledge library.
 """
 
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Float, DateTime, ForeignKey,
-    Table, JSON, Boolean, Index, UniqueConstraint, create_engine
+    Table, Boolean, Index
 )
-from sqlalchemy.orm import relationship, declarative_base, Session
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, ARRAY
+from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.dialects.postgresql import JSONB
 
 Base = declarative_base()
 

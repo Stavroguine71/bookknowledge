@@ -4,6 +4,7 @@ A living knowledge library that grows smarter with every book.
 """
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, Query
@@ -21,17 +22,29 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+# Track whether DB is ready (set by background init thread)
+_db_ready = False
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
-    logger.info("Initializing database...")
+
+def _background_db_init():
+    """Initialize DB in background so the server can start immediately."""
+    global _db_ready
     try:
-        init_db(retries=5, delay=3.0)
+        init_db(retries=10, delay=2.0)
+        _db_ready = True
         logger.info("Database ready.")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
-        logger.error("The app will start but database endpoints will fail until DB is available.")
+        logger.error("Database endpoints will fail until DB is available.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the server immediately; init DB in background."""
+    logger.info("Starting Book Intelligence Agent...")
+    # Don't block — init DB in a background thread so /health is reachable
+    thread = threading.Thread(target=_background_db_init, daemon=True)
+    thread.start()
     yield
 
 
@@ -73,14 +86,16 @@ def root():
 
 @app.get("/health", tags=["Info"])
 def health():
-    """Healthcheck endpoint — returns OK immediately so Railway doesn't kill the container."""
-    try:
-        from database import get_db_context
-        with get_db_context() as db:
-            book_count = db.query(Book).count()
-            return {"status": "healthy", "books_in_library": book_count}
-    except Exception:
-        return {"status": "starting", "books_in_library": 0}
+    """Healthcheck — always returns 200 so Railway keeps the container alive."""
+    if _db_ready:
+        try:
+            from database import get_db_context
+            with get_db_context() as db:
+                book_count = db.query(Book).count()
+                return {"status": "healthy", "books_in_library": book_count}
+        except Exception:
+            return {"status": "degraded", "books_in_library": 0}
+    return {"status": "starting", "books_in_library": 0}
 
 
 # ── MODE 1: Single Book Processing ─────────────────────────────────
